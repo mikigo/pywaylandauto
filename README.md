@@ -6,7 +6,7 @@
 </p>
 
 <h3 align="center">🖱️ ⌨️</h3>
-<h1 align="center">pywaylandauto</h1>
+<h1 align="center">PyWaylandAuto</h1>
 <p align="center">
   <b>Wayland 全局键鼠注入引擎</b><br/>
   <sub>一套 API，征服所有 Wayland 桌面。无需 root，开箱即用。</sub>
@@ -14,13 +14,13 @@
 
 ---
 
-## ✨ 为什么选择 pywaylandauto
+## ✨ 为什么选择 PyWaylandAuto
 
 在 Wayland 下模拟键盘鼠标输入 —— Linux 自动化生态的"最后一块拼图"。
 
 X11 时代有 `xdotool`、`pyautogui`，但 Wayland 的安全模型彻底封锁了全局输入注入。`ydotool`、`wtype` 各有局限；桌面自动化框架苦于碎片化。
 
-**pywaylandauto** 将 Kylin V11、Ubuntu 26.04、UOS V25 三种发行版完全不同的输入注入路径抽象成**统一的 Python API**，零心智负担，一行切。
+**PyWaylandAuto** 将 Kylin V11、Ubuntu 26.04、UOS V25 三种发行版完全不同的输入注入路径抽象成**统一的 Python API**，零心智负担，自动适配，一套代码通吃。
 
 </p>
 
