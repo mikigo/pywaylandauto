@@ -20,7 +20,7 @@
 
 X11 时代有 `xdotool`、`pyautogui`，但 Wayland 的安全模型彻底封锁了全局输入注入。`ydotool`、`wtype` 各有局限；桌面自动化框架苦于碎片化。
 
-**PyWaylandAuto** 将 Kylin V11、Ubuntu 26.04、UOS V25 三种发行版完全不同的输入注入路径抽象成**统一的 Python API**，零心智负担，自动适配，一套代码通吃。
+**PyWaylandAuto** 将 Kylin V11、Ubuntu 26.04 等发行版完全不同的输入注入路径抽象成**统一的 Python API**，零心智负担，自动适配，一套代码通吃。
 
 </p>
 
@@ -139,7 +139,7 @@ pwa.get_clipboard()                   # → {'text': '剪贴板内容'}
 
 | 后端 | 适用发行版 | 技术路径 |
 |------|-----------|----------|
-| **EIS (Kylin)** | Kylin V11 / UOS V25 | kylin-wlcom D-Bus → EIS socket |
+| **EIS (Kylin)** | Kylin V11 | kylin-wlcom D-Bus → EIS socket |
 | **EIS (Portal)** | Ubuntu 26.04 | XDG Desktop Portal RemoteDesktop |
 | **Wlroots** | Sway / Hyprland | `zwlr_virtual_pointer_v1` + `zwp_virtual_keyboard_v1` |
 
@@ -157,9 +157,9 @@ Kylin EIS → Portal EIS → Wlroots
 |--------|------|------|
 | Kylin V11 (kylin-wlcom) | ✅ 完整 | EIS (Kylin) |
 | Ubuntu 26.04 | ✅ 完整 | EIS (Portal) |
-| UOS V25 (kylin-wlcom) | ✅ 完整 | EIS (Kylin) |
 | Sway | ✅ 完整 | Wlroots |
 | Hyprland | ✅ 完整 | Wlroots |
+| UOS V25 (treeland) | 🚧 规划中 | — |
 
 ---
 
