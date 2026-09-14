@@ -110,6 +110,8 @@ pywaylandauto get-clipboard         # 读取剪贴板
 ## 🧩 Python API 完整参考
 
 ```python
+import pywaylandauto as pwa
+
 # 鼠标
 pwa.move(x, y)                        # 绝对移动
 pwa.move_rel(dx, dy)                  # 相对移动
