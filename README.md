@@ -161,7 +161,6 @@ Kylin EIS → Portal EIS → Wlroots
 | Ubuntu 26.04 | ✅ 完整 | EIS (Portal) |
 | Sway | ✅ 完整 | Wlroots |
 | Hyprland | ✅ 完整 | Wlroots |
-| UOS V25 (treeland) | 🚧 规划中 | — |
 
 ---
 
