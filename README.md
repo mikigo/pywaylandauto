@@ -1,13 +1,19 @@
 # pywaylandauto
 
-Wayland 键盘鼠标输入注入工具。通过 EIS (Emulated Input Server) 或 wlroots 虚拟输入协议实现全局鼠标键盘控制。
-
-> 当前适配 Kylin V11 (kylin-wlcom)。UOS、Ubuntu 等发行版规划中。
+Wayland 键盘鼠标输入注入工具。通过 EIS (Emulated Input Server) 或 wlroots 虚拟输入协议实现全局鼠标键盘控制，支持 Kylin / Ubuntu GNOME / wlroots 等多种 Wayland 环境。
 
 ## 安装
 
 ```bash
 pip install pywaylandauto
+```
+
+或开发模式：
+
+```bash
+git clone https://github.com/.../pywaylandauto.git
+cd pywaylandauto
+pip install -e .
 ```
 
 ## 快速开始
@@ -19,6 +25,7 @@ pywaylandauto click 500 300         # 左键点击
 pywaylandauto right-click 500 300   # 右键点击
 pywaylandauto input "Hello 世界"    # 输入文本（中文通过剪贴板粘贴）
 pywaylandauto key ctrl c            # 组合键 Ctrl+C
+pywaylandauto get-clipboard         # 获取剪贴板内容
 pywaylandauto daemon stop           # 停止 daemon
 ```
 
@@ -31,7 +38,8 @@ pywaylandauto daemon stop           # 停止 daemon
 | `pywaylandauto daemon start` | 启动 daemon（后台运行） |
 | `pywaylandauto daemon stop` | 停止 daemon |
 | `pywaylandauto daemon status` | daemon 进程状态 |
-| `pywaylandauto status` | 完整状态：daemon、backend、坐标、缩放比 |
+| `pywaylandauto status` | 完整状态：daemon、backend、坐标、缩放比、keymap |
+| `pywaylandauto session-start [--wait]` | Portal 会话重授权（GNOME 授权弹窗） |
 
 ### 鼠标
 
@@ -52,10 +60,11 @@ pywaylandauto daemon stop           # 停止 daemon
 
 | 命令 | 说明 |
 |---|---|
-| `input TEXT` | 输入文本 |
-| `key KEY [KEY...]` | 按键（多键=组合键） |
+| `input TEXT` | 输入文本（ASCII 直接键入，中文/Unicode 通过剪贴板粘贴） |
+| `key KEY [KEY...]` | 按键（多键=组合键，如 `ctrl c`） |
 | `key-down KEY` | 按下不放 |
 | `key-up KEY` | 释放 |
+| `get-clipboard` | 获取当前剪贴板内容 |
 
 ## Python API
 
@@ -76,16 +85,29 @@ pywaylandauto.key_down("shift")
 pywaylandauto.key_up("shift")
 
 pos = pywaylandauto.mouse_position()  # {'x': 500.0, 'y': 300.0}
+text = pywaylandauto.get_clipboard()  # {'text': '剪贴板内容'}
 ```
 
 首次调用自动启动 daemon。坐标使用物理像素，daemon 自动按缩放比转换。
 
-## 路线图
+## 后端
 
-- [x] Kylin V11 (kylin-wlcom) — EIS + wlroots 双后端
-- [ ] UOS — EIS D-Bus 入口适配
-- [ ] Ubuntu / GNOME — XDG Desktop Portal RemoteDesktop 入口适配
-- [ ] Sway / Hyprland — wlroots backend 开箱可用，需验证
+| 后端 | 平台 | 说明 |
+|---|---|---|
+| EIS (Kylin) | Kylin V11 | 直接通过 kylin-wlcom D-Bus 连接 EIS |
+| EIS (Portal) | Ubuntu / GNOME | 通过 XDG Desktop Portal RemoteDesktop 获取 EIS 连接 |
+| Wlroots | Sway / Hyprland | zwlr_virtual_pointer + zwp_virtual_keyboard |
+
+启动 daemon 时自动探测后端：Kylin EIS → Portal EIS → Wlroots。
+
+## 平台支持
+
+| 平台 | 状态 |
+|---|---|
+| Kylin V11 (kylin-wlcom) | ✅ 完整支持 |
+| Ubuntu / GNOME | ✅ 完整支持 |
+| Deepin / UOS | 规划中 |
+| Sway / Hyprland | ✅ Wlroots 后端 |
 
 ## 许可
 

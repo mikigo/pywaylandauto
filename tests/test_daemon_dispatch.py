@@ -42,6 +42,9 @@ class _FakeBackend:
         for keycode, press in events:
             self.calls.append(("key", keycode, press))
 
+    def key_combo_frame(self, *keycodes):
+        self.calls.append(("key_combo_frame", *keycodes))
+
     def type_text(self, text):
         self.calls.append(("type_text", text))
 
@@ -191,12 +194,12 @@ class TestDaemonDispatch:
     # -- keyboard (EIS backend) ---------------------------------------------
 
     def test_presskey_eis(self):
-        """Verify presskey calls backend with correct keycode sequence."""
+        """Verify presskey combo sends individual key events with delays."""
         d = _make_daemon(FakeEisBackend("eis"))
         d._dispatch("input.presskey", {"keys": ["ctrl", "c"]})
         assert d._backend.calls == [
-            ("key", 97, PRESS),   # ctrl → keycode 97
-            ("key", 46, PRESS),   # c → keycode 46
+            ("key", 97, PRESS),
+            ("key", 46, PRESS),
             ("key", 46, RELEASE),
             ("key", 97, RELEASE),
         ]

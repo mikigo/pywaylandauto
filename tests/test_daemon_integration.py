@@ -43,6 +43,9 @@ class _FakeStartedBackend:
         for keycode, press in events:
             self.calls.append(("key", keycode, press))
 
+    def key_combo_frame(self, *keycodes):
+        self.calls.append(("key_combo_frame", *keycodes))
+
     def type_text(self, t):
         self.calls.append(("type_text", t))
 

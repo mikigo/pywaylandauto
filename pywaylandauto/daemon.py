@@ -2,6 +2,7 @@ import errno
 import logging
 import os
 import socket
+import time
 
 import gi
 gi.require_version("GLib", "2.0")
@@ -16,8 +17,10 @@ except (ImportError, ValueError):
 from . import __version__, protocol
 from .backends.base import BUTTONS, PRESS, RELEASE, BackendError
 from .backends.eis.backend import EisBackend, EisError
+from .backends.eis.kylin import connect as kylin_connect
+from .backends.portal.backend import PortalBackend
 from .backends.wlroots.backend import WlrootsBackend
-from .backends.wlroots.clipboard import set_clipboard
+from .backends.wlroots.clipboard import set_clipboard, get_clipboard
 from .keysyms import lookup as lookup_keysym
 
 log = logging.getLogger(__name__)
@@ -183,34 +186,58 @@ class Daemon:
     # -- backend ----------------------------------------------------------
 
     def _start_backend(self) -> None:
+        # 1) Kylin EIS (original)
         try:
-            be = EisBackend()
+            be = EisBackend(connect_fn=kylin_connect)
             be.start()
             self._backend = be
             self._start_eis_pump()
             if be.regions:
-                self._scale = be.regions[0][4]  # scale from first region
-            log.info("transport: eis (scale=%.1f)", self._scale)
+                self._scale = be.regions[0][4]
+            log.info("transport: eis (kylin)  scale=%.1f", self._scale)
+            return
         except Exception as e:
-            log.warning("EIS backend failed: %s, falling back to wlroots", e)
-            try:
-                be = WlrootsBackend()
-                be.start()
-                self._backend = be
-                log.info("transport: wlroots")
-            except Exception as e2:
-                log.warning("wlroots backend also failed: %s", e2)
-                self._backend = None
+            log.info("Kylin EIS backend not available: %s", e)
 
-    def _start_eis_pump(self) -> None:
-        if self._backend is None or not getattr(self._backend, "name", "") == "eis":
+        # 2) Portal EIS (GNOME/Ubuntu)
+        try:
+            be = PortalBackend()
+            be.on_eis_ready = self._start_eis_pump
+            be.start()
+            self._backend = be
+            log.info("transport: portal (initiating session flow)")
+            return
+        except Exception as e:
+            log.info("Portal backend not available: %s", e)
+
+        # 3) wlroots fallback
+        try:
+            be = WlrootsBackend()
+            be.start()
+            self._backend = be
+            log.info("transport: wlroots")
+        except Exception as e2:
+            log.warning("wlroots backend also failed: %s", e2)
+            self._backend = None
+
+    def _start_eis_pump(self, *args) -> None:
+        if self._backend is None:
+            return
+        name = getattr(self._backend, "name", "")
+        if name not in ("eis", "portal-eis"):
             return
         fd = getattr(self._backend, "fd", -1)
         if fd < 0:
             return
+        if self._pump_source is not None:
+            GLib.source_remove(self._pump_source)
         self._pump_source = GLib.io_add_watch(
             fd, GLib.PRIORITY_DEFAULT, GLib.IO_IN, self._on_eis_ready
         )
+        regions = getattr(self._backend, "regions", None)
+        if regions:
+            self._scale = regions[0][4]
+            log.info("scale updated to %.1f from backend regions", self._scale)
 
     def _on_eis_ready(self, fd, cond) -> bool:
         if self._backend is None:
@@ -222,8 +249,17 @@ class Daemon:
         return True
 
     def _ensure_started(self) -> None:
-        if self._backend is None or self._backend.state != "started":
+        if self._backend is None:
             raise BackendError("backend not ready")
+        state = self._backend.state
+        if state == "started":
+            return
+        if state == "starting":
+            raise protocol.ProtocolError(
+                protocol.ERR_PERMISSION_PENDING,
+                "session is starting — grant the dialog and retry",
+            )
+        raise BackendError("backend not ready")
 
     def _do_move_abs(self, x: float, y: float) -> None:
         lx, ly = self._to_logical(x, y)
@@ -233,14 +269,19 @@ class Daemon:
         self._mouse_x, self._mouse_y = x, y
 
     def _type_via_clipboard(self, text: str) -> None:
-        import time
-        set_clipboard(text)
+        ok, cleanup = set_clipboard(text)
+        if not ok:
+            raise BackendError(
+                "clipboard set failed — no clipboard backend available"
+            )
         time.sleep(0.3)
         self._presskey(["ctrl", "v"])
-        time.sleep(0.05)
+        time.sleep(0.3)
+        if cleanup:
+            cleanup()
 
     def _presskey(self, keys: list[str]) -> None:
-        if getattr(self._backend, "name", "") == "eis":
+        if getattr(self._backend, "name", "") in ("eis", "portal-eis"):
             self._presskey_eis(keys)
         else:
             self._presskey_wlroots(keys)
@@ -332,6 +373,9 @@ class Daemon:
             return {"version": __version__}
         if method == "status":
             return self._status()
+        if method == "session.start":
+            self._backend.start()
+            return {"state": self._backend.state}
         if method == "daemon.stop":
             return {"stopped": True}
 
@@ -419,7 +463,7 @@ class Daemon:
                     "param 'keys' must be a list of strings",
                 )
             self._ensure_started()
-            if getattr(self._backend, "name", "") == "eis":
+            if getattr(self._backend, "name", "") in ("eis", "portal-eis"):
                 self._presskey_eis(keys)
             else:
                 self._presskey_wlroots(keys)
@@ -446,6 +490,9 @@ class Daemon:
             return {}
         if method == "input.mouse_position":
             return {"x": self._mouse_x, "y": self._mouse_y}
+        if method == "input.get_clipboard":
+            text = get_clipboard()
+            return {"text": text}
 
         raise protocol.ProtocolError(
             protocol.ERR_METHOD_NOT_FOUND, f"unknown method {method!r}"
@@ -461,7 +508,7 @@ class Daemon:
         keysym = lookup_keysym(key)
         if keysym is None:
             raise BackendError(f"unknown key: {key!r}")
-        if getattr(self._backend, "name", "") == "eis":
+        if getattr(self._backend, "name", "") in ("eis", "portal-eis"):
             keycode = self._backend.resolve_key(keysym)
             if keycode is None:
                 raise BackendError(f"keysym 0x{keysym:04x} not in keymap")
@@ -482,16 +529,13 @@ class Daemon:
             kc = self._backend.resolve_key(keysym)
             if kc is None:
                 raise BackendError(f"keysym 0x{keysym:04x} not in keymap")
-            log.info("presskey: %s -> keysym 0x%04x -> keycode %d", key_name, keysym, kc)
             keycodes.append(kc)
-        # Build all events in order: press all, release all (reversed)
-        events = []
         for kc in keycodes:
-            events.append((kc, PRESS))
+            self._backend.key(kc, PRESS)
+            time.sleep(0.05)
         for kc in reversed(keycodes):
-            events.append((kc, RELEASE))
-        log.info("presskey frame: %s", events)
-        self._backend.key_sequence(*events)
+            self._backend.key(kc, RELEASE)
+            time.sleep(0.05)
 
     def _presskey_wlroots(self, keys: list[str]) -> None:
         keycodes = []
@@ -514,9 +558,20 @@ class Daemon:
         backend_info = {}
         if self._backend is not None:
             backend_info = self._backend.status()
+
+        keymap_info = {}
+        try:
+            if hasattr(self._backend, '_resolver') and self._backend._resolver is not None:
+                ctrl_kc = self._backend._resolver(0xFFE3)  # Control_L
+                v_kc = self._backend._resolver(0x0076)     # v
+                keymap_info = {"ctrl_keycode": ctrl_kc, "v_keycode": v_kc}
+        except Exception:
+            pass
+
         return {
             "daemon": {"pid": os.getpid(), "socket": self.socket_path},
             "backend": backend_info,
             "mouse": {"x": self._mouse_x, "y": self._mouse_y},
             "scale": self._scale,
+            "keymap": keymap_info,
         }

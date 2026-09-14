@@ -29,6 +29,9 @@ def key_up(key):        _get_client().key_up(key)
 def mouse_position():
     return _get_client().mouse_position()
 
+def get_clipboard():
+    return _get_client().get_clipboard()
+
 def daemon_start():
     """启动 daemon（前台阻塞运行）"""
     from .daemon import Daemon; Daemon().run()

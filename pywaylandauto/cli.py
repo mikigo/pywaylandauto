@@ -54,6 +54,10 @@ def _client(socket_path: str = None, auto_spawn: bool = True) -> Client:
     return Client(socket_path=socket_path, auto_spawn=auto_spawn)
 
 
+DIALOG_WAIT_SECONDS = 60
+DIALOG_POLL_INTERVAL = 1.0
+
+
 # -- common option decorator -------------------------------------------------
 
 socket_opt = typer.Option(None, help="Daemon socket path")
@@ -129,6 +133,37 @@ def daemon_pid_status(
 # ============================================================================
 
 @app.command()
+def session_start(
+    socket: str = typer.Option(None, help="Daemon socket path"),
+    no_spawn: bool = typer.Option(False, "--no-spawn", help="Don't auto-spawn daemon"),
+    wait: bool = typer.Option(False, "--wait", "-w", help="Wait for authorization dialog to be granted (max 60s)"),
+):
+    """Re-start the portal session (re-pops the authorization dialog)."""
+    c = _client(socket, auto_spawn=not no_spawn)
+    try:
+        result = c.session_start()
+    except protocol.RemoteError as e:
+        if e.code == protocol.ERR_PERMISSION_PENDING and wait:
+            typer.echo("等待授权弹窗…(请在桌面点击\"允许\")", err=True)
+            deadline = time.monotonic() + DIALOG_WAIT_SECONDS
+            while time.monotonic() < deadline:
+                time.sleep(DIALOG_POLL_INTERVAL)
+                try:
+                    s = c.status()
+                    st = s.get("backend", {}).get("state")
+                except Exception:
+                    st = None
+                if st == "started":
+                    typer.echo(f"session state: started")
+                    return
+            _die(f"授权超时({DIALOG_WAIT_SECONDS}s)")
+        _die(f"{e.code}: {e.message}")
+    except (ConnectionError, FileNotFoundError, TimeoutError) as e:
+        _die(str(e))
+    typer.echo(f"session state: {result.get('state', 'unknown')}")
+
+
+@app.command()
 def status(
     socket: str = typer.Option(None, help="Daemon socket path"),
     no_spawn: bool = typer.Option(False, "--no-spawn", help="Don't auto-spawn daemon"),
@@ -145,9 +180,16 @@ def status(
     mouse = result.get("mouse", {})
     scale = result.get("scale", 1.0)
     regions = backend.get("regions", [])
+    keymap = result.get("keymap", {})
 
     typer.echo(f"daemon:  pid={daemon_info.get('pid','?')}  socket={daemon_info.get('socket','?')}")
     typer.echo(f"backend: state={backend.get('state')}  transport={backend.get('transport')}")
+    if backend.get("transport") == "portal-eis" or "portal" in str(backend.get("transport", "")):
+        typer.echo(f"session: devices={backend.get('devices',[])}  has_token={backend.get('has_token', False)}")
+    if backend.get("error"):
+        typer.echo(f"error:   {backend['error']}")
+    if keymap:
+        typer.echo(f"keymap:  ctrl={keymap.get('ctrl_keycode')}  v={keymap.get('v_keycode')}")
     typer.echo(f"mouse:   x={mouse.get('x',0):.0f}  y={mouse.get('y',0):.0f}  scale={scale}")
     for r in regions:
         typer.echo(f"region:  {r[0]}+{r[1]} {r[2]}x{r[3]} @ {r[4]}x")
@@ -318,6 +360,26 @@ def key_up(
 ):
     """Release a pressed key."""
     _client(socket, auto_spawn=not no_spawn).key_up(key_name)
+
+
+@app.command()
+def get_clipboard(
+    socket: str = typer.Option(None, help="Daemon socket path"),
+    no_spawn: bool = typer.Option(False, "--no-spawn", help="Don't auto-spawn daemon"),
+):
+    """Get current clipboard text content."""
+    c = _client(socket, auto_spawn=not no_spawn)
+    try:
+        result = c.get_clipboard()
+    except (ConnectionError, protocol.RemoteError) as e:
+        _die(str(e))
+    text = result.get("text")
+    if text:
+        typer.echo(text, nl=False)
+    elif text == "":
+        pass  # empty clipboard, output nothing
+    else:
+        _die("clipboard is empty or unavailable")
 
 
 # ============================================================================

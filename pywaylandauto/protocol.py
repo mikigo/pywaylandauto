@@ -20,6 +20,12 @@ ERR_BACKEND_ERROR = "backend_error"
 ERR_BACKEND_UNAVAILABLE = "backend_unavailable"
 ERR_MONITOR_LAYOUT = "monitor_layout_unavailable"
 ERR_UNSUPPORTED_CHAR = "unsupported_character"
+ERR_SESSION_NOT_STARTED = "session_not_started"
+ERR_PERMISSION_PENDING = "permission_pending"
+ERR_PERMISSION_DENIED = "permission_denied"
+ERR_PORTAL_UNAVAILABLE = "portal_unavailable"
+ERR_PORTAL_FAILED = "portal_failed"
+ERR_CANCELLED = "cancelled"
 
 
 class ProtocolError(Exception):

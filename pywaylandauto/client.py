@@ -113,6 +113,9 @@ class Client:
     def status(self) -> dict:
         return self.request("status")
 
+    def session_start(self) -> dict:
+        return self.request("session.start")
+
     def move_abs(self, x: float, y: float) -> dict:
         return self.request("input.move_abs", {"x": x, "y": y})
 
@@ -153,6 +156,9 @@ class Client:
 
     def mouse_position(self) -> dict:
         return self.request("input.mouse_position")
+
+    def get_clipboard(self) -> dict:
+        return self.request("input.get_clipboard")
 
     def daemon_stop(self) -> dict:
         return self.request("daemon.stop")

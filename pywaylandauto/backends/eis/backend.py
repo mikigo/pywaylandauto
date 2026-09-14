@@ -163,6 +163,38 @@ class _EisClient:
                        *m.KEYBOARD_REQ["key"], (keycode, press))
         self._end_frame(self._keyboard)
 
+    def key_combo_frame(self, *keycodes: int):
+        """Send key combo in 2 frames: mods in frame 1, main+releases in frame 2."""
+        kb = self._keyboard.sub["ei_keyboard"]
+        PRESS = 1
+        RELEASE = 0
+
+        if len(keycodes) <= 1:
+            self._begin_frame(self._keyboard)
+            self._send(kb, *m.KEYBOARD_REQ["key"], (keycodes[0], PRESS))
+            self._send(kb, *m.KEYBOARD_REQ["key"], (keycodes[0], RELEASE))
+            self._end_frame(self._keyboard)
+            return
+
+        mods = keycodes[:-1]
+        main = keycodes[-1]
+
+        # Frame 1: press all modifiers
+        self._begin_frame(self._keyboard)
+        for kc in mods:
+            self._send(kb, *m.KEYBOARD_REQ["key"], (kc, PRESS))
+        self._end_frame(self._keyboard)
+
+        # Frame 2: press modifiers again, main key, release all
+        self._begin_frame(self._keyboard)
+        for kc in mods:
+            self._send(kb, *m.KEYBOARD_REQ["key"], (kc, PRESS))
+        self._send(kb, *m.KEYBOARD_REQ["key"], (main, PRESS))
+        self._send(kb, *m.KEYBOARD_REQ["key"], (main, RELEASE))
+        for kc in reversed(mods):
+            self._send(kb, *m.KEYBOARD_REQ["key"], (kc, RELEASE))
+        self._end_frame(self._keyboard)
+
     def _pump_once(self):
         try:
             data, ancdata, _flags, _addr = self._sock.recvmsg(
@@ -360,6 +392,12 @@ class EisBackend(Backend):
         if self._state != "started":
             raise BackendError("backend not started")
         self._client.key_sequence(*key_events)
+
+    def key_combo_frame(self, *keycodes: int):
+        """Send key combo in 2 frames: mods press, then main + releases."""
+        if self._state != "started":
+            raise BackendError("backend not started")
+        self._client.key_combo_frame(*keycodes)
 
     def resolve_key(self, keysym):
         if self._resolver is None:

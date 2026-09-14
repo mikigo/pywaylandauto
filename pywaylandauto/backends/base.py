@@ -6,6 +6,7 @@ class BackendError(Exception):
 
 BUTTONS = {"left": 0x110, "right": 0x111, "middle": 0x112}
 PRESS, RELEASE = 1, 0
+AXIS_VERTICAL, AXIS_HORIZONTAL = 0, 1
 
 class Backend(ABC):
     name = "base"
