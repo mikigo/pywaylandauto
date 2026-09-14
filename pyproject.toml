@@ -1,6 +1,6 @@
 [project]
 name = "pywaylandauto"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Wayland keyboard/mouse input injection for Kylin OS (kylin-wlcom)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -22,3 +22,6 @@ include = ["pywaylandauto*"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+
+[tool.setuptools.dynamic]
+version = {attr = "pywaylandauto.__version__.VERSION"}

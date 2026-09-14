@@ -58,12 +58,6 @@ DIALOG_WAIT_SECONDS = 60
 DIALOG_POLL_INTERVAL = 1.0
 
 
-# -- common option decorator -------------------------------------------------
-
-socket_opt = typer.Option(None, help="Daemon socket path")
-no_spawn_opt = typer.Option(False, "--no-spawn", help="Don't auto-spawn the daemon")
-
-
 # ============================================================================
 #  Daemon commands
 # ============================================================================
@@ -123,7 +117,7 @@ def daemon_pid_status(
     """Show daemon process status."""
     pid_path = pid_file or default_pid_path()
     if os.path.exists(pid_path):
-        console.print(f"pid: [bold]{_read_pid(pid_path)}[/]")
+        typer.echo(f"pid: {_read_pid(pid_path)}")
         return
     _die("no running daemon (no pid file)")
 
@@ -387,7 +381,6 @@ def get_clipboard(
 # ============================================================================
 
 def main(argv=None):
-    import sys
     if argv is None:
         argv = sys.argv[1:]
     # Click treats negative-positional-args like `-200` as option `-2 0 0`.

@@ -1,5 +1,6 @@
 """pywaylandauto — Wayland keyboard/mouse input injection for Kylin OS."""
-__version__ = "0.1.0"
+from .__version__ import VERSION
+__version__ = VERSION
 
 from .client import Client
 
