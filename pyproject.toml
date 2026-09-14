@@ -1,0 +1,24 @@
+[project]
+name = "pywaylandauto"
+version = "0.1.0"
+description = "Wayland keyboard/mouse input injection for Kylin OS (kylin-wlcom)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dbus-python>=1.4.0",
+    "PyGObject>=3.50",
+    "typer>=0.12",
+]
+
+[project.scripts]
+pywaylandauto = "pywaylandauto.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["pywaylandauto*"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
