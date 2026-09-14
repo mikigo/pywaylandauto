@@ -23,6 +23,7 @@ from .keysyms import lookup as lookup_keysym
 log = logging.getLogger(__name__)
 
 RECV_CHUNK = 65536
+IDLE_TIMEOUT = 7200  # seconds (2 hours)
 
 
 class AlreadyRunningError(Exception):
@@ -72,12 +73,23 @@ class Daemon:
         self._mouse_x = 0.0
         self._mouse_y = 0.0
         self._scale = 1.0
+        self._idle_source = None
 
-    def _to_physical(self, x: float, y: float) -> tuple[float, float]:
-        """Convert physical pixels to logical coordinates for EIS."""
-        if self._scale != 1.0 and self._scale > 0:
-            return x / self._scale, y / self._scale
+    def _to_logical(self, x: float, y: float) -> tuple[float, float]:
         return x, y
+
+    def _reset_idle_timeout(self) -> None:
+        if self._idle_source is not None:
+            GLib.source_remove(self._idle_source)
+            self._idle_source = None
+        self._idle_source = GLib.timeout_add_seconds(
+            IDLE_TIMEOUT, self._on_idle_timeout
+        )
+
+    def _on_idle_timeout(self) -> bool:
+        log.info("idle timeout (%ds) reached, shutting down", IDLE_TIMEOUT)
+        self.stop()
+        return False
 
     # -- lifecycle -------------------------------------------------------
 
@@ -96,6 +108,7 @@ class Daemon:
             else:
                 GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signum, self._on_signal)
         log.info("daemon listening on %s (pid %d)", self.socket_path, os.getpid())
+        self._reset_idle_timeout()
         try:
             self._loop.run()
         finally:
@@ -148,6 +161,9 @@ class Daemon:
             log.warning("cannot write pid file %s: %s", self.pid_path, e)
 
     def _cleanup(self) -> None:
+        if self._idle_source is not None:
+            GLib.source_remove(self._idle_source)
+            self._idle_source = None
         if self._pump_source is not None:
             GLib.source_remove(self._pump_source)
             self._pump_source = None
@@ -210,7 +226,9 @@ class Daemon:
             raise BackendError("backend not ready")
 
     def _do_move_abs(self, x: float, y: float) -> None:
-        lx, ly = self._to_physical(x, y)
+        lx, ly = self._to_logical(x, y)
+        log.info("_do_move_abs: input=(%.1f, %.1f) logical=(%.1f, %.1f) scale=%.2f backend=%s",
+                 x, y, lx, ly, self._scale, getattr(self._backend, "name", "?"))
         self._backend.move_abs(lx, ly)
         self._mouse_x, self._mouse_y = x, y
 
@@ -299,6 +317,7 @@ class Daemon:
             return protocol.encode_response(
                 req["id"], ok=False, error={"code": code, "message": str(e)}
             )
+        self._reset_idle_timeout()
         response = protocol.encode_response(req["id"], ok=True, result=result)
         if quit_after:
             GLib.timeout_add(50, self._quit_soon)

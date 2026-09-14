@@ -7,19 +7,33 @@ import time
 from typing import Optional
 
 import typer
+import typer.core
 
 from . import __version__, protocol
 from .client import Client
 from .daemon import AlreadyRunningError, Daemon, default_pid_path, default_socket_path
+
+
+class _OrderedGroup(typer.core.TyperGroup):
+    def list_commands(self, ctx):
+        commands = list(super().list_commands(ctx))
+        for name in ("daemon",):
+            if name in commands:
+                commands.remove(name)
+                commands.insert(0, name)
+        return commands
+
 
 app = typer.Typer(
     name="pywaylandauto",
     help="Wayland keyboard/mouse input injection tool",
     add_completion=False,
     no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
+    cls=_OrderedGroup,
 )
 
-daemon_app = typer.Typer(help="Daemon lifecycle management")
+daemon_app = typer.Typer(help="Daemon lifecycle management", context_settings={"help_option_names": ["-h", "--help"]})
 app.add_typer(daemon_app, name="daemon")
 
 
@@ -311,6 +325,23 @@ def key_up(
 # ============================================================================
 
 def main(argv=None):
+    import sys
+    if argv is None:
+        argv = sys.argv[1:]
+    # Click treats negative-positional-args like `-200` as option `-2 0 0`.
+    # Detect commands that take float args and insert `--` before them.
+    _neg_cmds = frozenset(("move", "move-rel", "scroll"))
+    if len(argv) >= 2 and argv[0] in _neg_cmds:
+        for i in range(1, len(argv)):
+            a = argv[i]
+            if a.startswith("-") and not a.startswith("--"):
+                try:
+                    float(a)
+                    argv = list(argv[:i]) + ["--"] + list(argv[i:])
+                    break
+                except ValueError:
+                    continue
+        sys.argv[1:] = argv
     try:
         app()
     except Exception as e:

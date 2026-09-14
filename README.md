@@ -7,10 +7,7 @@ Wayland 键盘鼠标输入注入工具。通过 EIS (Emulated Input Server) 或 
 ## 安装
 
 ```bash
-git clone https://github.com/.../pywaylandauto.git
-cd pywaylandauto
-python3 -m venv --system-site-packages .venv
-.venv/bin/pip install -e .
+pip install pywaylandauto
 ```
 
 ## 快速开始
@@ -82,20 +79,6 @@ pos = pywaylandauto.mouse_position()  # {'x': 500.0, 'y': 300.0}
 ```
 
 首次调用自动启动 daemon。坐标使用物理像素，daemon 自动按缩放比转换。
-
-## 架构
-
-```
-CLI / Python API
-    └── Client (UNIX socket + JSON 协议)
-          └── Daemon (GLib 主循环)
-                ├── EIS Backend  ──→ com.kylin.Wlcom.EIS.RemoteDesktop
-                └── Wlroots Backend (回退) ──→ Wayland socket
-```
-
-- Socket：`$XDG_RUNTIME_DIR/pywaylandauto.sock`（0600）
-- 无授权弹窗，daemon 启动即连接
-- 坐标自动物理像素 → 逻辑坐标转换
 
 ## 路线图
 
