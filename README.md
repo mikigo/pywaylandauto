@@ -183,7 +183,7 @@ pip install pywaylandauto
 开发安装：
 
 ```bash
-git clone https://github.com/your-org/pywaylandauto.git
+git clone https://github.com/mikigo/pywaylandauto.git
 cd pywaylandauto
 pip install -e ".[dev]"
 ```
