@@ -18,11 +18,19 @@
 
 在 Wayland 下模拟键盘鼠标输入 —— Linux 自动化生态的"最后一块拼图"。
 
-X11 时代有 `xdotool`、`pyautogui`，但 Wayland 的安全模型彻底封锁了全局输入注入。`ydotool`、`wtype` 各有局限；桌面自动化框架苦于碎片化。
+X11 时代有 `xdotool`、`pyautogui`，但 Wayland 的安全模型彻底封锁了全局输入注入。`ydotool` 需要 root，`wdotool` 不支持中文输入、不覆盖国产发行版，桌面自动化框架苦于碎片化。
 
-**PyWaylandAuto** 将 Kylin V11、Ubuntu 26.04 等发行版完全不同的输入注入路径抽象成**统一的 Python API**，零心智负担，自动适配，一套代码通吃。
+**PyWaylandAuto** 将 Kylin V11、Ubuntu 26.04、UOS Treeland 等发行版完全不同的输入注入路径抽象成**统一的 Python API**，零心智负担，自动适配，一套代码通吃。
 
-</p>
+**与同类工具的核心差异：**
+
+| 特性 | PyWaylandAuto | wdotool | ydotool |
+|---|---|---|---|
+| **Kylin V11 + UOS (wlroots 系)** | ✅ wlroots 后端 + Kylin EIS D-Bus 捷径（无弹窗） | ✅ wlroots 后端 | ❌ |
+| **中文输入** | ✅ ASCII 直键 + 中文剪贴板粘贴 | ❌ 仅发 keycode | ❌ |
+| **daemon 长连接** | ✅ 弹窗仅一次 | ✅ | N/A |
+| **Python 生态** | ✅ `pip install` | Rust CLI | C CLI |
+| **授权方式** | EIS D-Bus / Portal / 协议直连 | Portal / 协议 | root |
 
 ---
 
@@ -65,9 +73,9 @@ flowchart LR
         HUB["Backend Hub"]
     end
 
-    HUB --> EIS_K["EIS (Kylin)<br>kylin-wlcom D-Bus"]
+    HUB --> EIS_K["EIS (Kylin)<br>kylin-wlcom D-Bus 捷径"]
     HUB --> EIS_P["EIS (Portal)<br>XDG Desktop Portal"]
-    HUB --> WLR["Wlroots<br>zwlr_virtual_pointer + keyboard"]
+    HUB --> WLR["Wlroots<br>Kylin / UOS / Sway / Hyprland"]
 ```
 
 **Client-Daemon 分离设计：**
@@ -141,9 +149,11 @@ pwa.get_clipboard()                   # → {'text': '剪贴板内容'}
 
 | 后端 | 适用发行版 | 技术路径 |
 |------|-----------|----------|
-| **EIS (Kylin)** | Kylin V11 | kylin-wlcom D-Bus → EIS socket |
-| **EIS (Portal)** | Ubuntu 26.04 | XDG Desktop Portal RemoteDesktop |
-| **Wlroots** | Sway / Hyprland | `zwlr_virtual_pointer_v1` + `zwp_virtual_keyboard_v1` |
+| **EIS (Kylin)** | Kylin V11 | kylin-wlcom D-Bus → EIS socket（wlroots 之上，直连无弹窗） |
+| **EIS (Portal)** | Ubuntu 26.04 / GNOME 46+ | XDG Desktop Portal RemoteDesktop |
+| **Wlroots** | Kylin V11 / UOS Treeland / Sway / Hyprland | `zwlr_virtual_pointer_v1` + `zwp_virtual_keyboard_v1`，无弹窗 |
+
+> Kylin wlcom 和 UOS Treeland 底层均基于 wlroots。Kylin 额外暴露了私有 EIS D-Bus 接口作为更快路径，PyWaylandAuto 优先走它；若不可用则回退到 wlroots 协议。
 
 启动 daemon 时**自动探测**可用后端，优先选择原生 EIS 路径，fallback 至 wlroots 虚拟设备。
 
@@ -155,12 +165,12 @@ Kylin EIS → Portal EIS → Wlroots
 
 ## 🗺️ 平台兼容性
 
-| 发行版 | 状态 | 后端 |
-|--------|------|------|
-| Kylin V11 (kylin-wlcom) | ✅ 完整 | EIS (Kylin) |
-| Ubuntu 26.04 | ✅ 完整 | EIS (Portal) |
-| Sway | ✅ 完整 | Wlroots |
-| Hyprland | ✅ 完整 | Wlroots |
+| 发行版 | 合成器 | 底层 | 后端 | 备注 |
+|--------|------|------|------|------|
+| Kylin V11 | kylin-wlcom | wlroots | EIS (Kylin) > Wlroots | 优先走 EIS D-Bus 捷径；回退 wlroots 协议 |
+| UOS | Treeland | wlroots | Wlroots | 标准 wlroots 虚拟设备协议 |
+| Ubuntu 26.04 (GNOME) | mutter | mutter | EIS (Portal) | Portal 授权弹窗一次，token 缓存 |
+| Sway / Hyprland | wlroots | wlroots | Wlroots |  |
 
 ---
 
